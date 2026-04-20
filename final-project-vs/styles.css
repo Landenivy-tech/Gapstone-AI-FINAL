@@ -1,0 +1,180 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+}
+
+nav {
+    background-color: #f9f9f9;
+    padding: 10px 20px;
+    border-bottom: 1px solid #ddd;
+}
+
+nav ul {
+    list-style: none;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+nav li {
+    display: inline;
+}
+
+nav a {
+    color: #333;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 5px;
+    transition: background 0.3s;
+}
+
+nav a:hover {
+    background: rgba(102, 126, 234, 0.2);
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px 20px;
+    text-align: center;
+}
+
+h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    font-size: 1em;
+    opacity: 0.9;
+    margin-bottom: 20px;
+}
+
+.controls {
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+input[type="text"] {
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 1em;
+    width: 200px;
+}
+
+button {
+    padding: 10px 20px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 600;
+    transition: background 0.3s;
+}
+
+button:hover {
+    background: #764ba2;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background-color: #f5f5f5;
+}
+
+th {
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #ddd;
+    cursor: pointer;
+}
+
+th:hover {
+    background-color: #e8e8e8;
+}
+
+td {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+tbody tr:hover {
+    background-color: #f9f9f9;
+    transform: scale(1.01);
+    transition: all 0.2s;
+}
+
+.rank {
+    font-weight: bold;
+    color: #667eea;
+    font-size: 1.2em;
+    width: 50px;
+}
+
+.rank.top1 {
+    color: gold;
+    font-size: 1.4em;
+}
+
+.rank.top2 {
+    color: silver;
+    font-size: 1.3em;
+}
+
+.rank.top3 {
+    color: #cd7f32;
+    font-size: 1.2em;
+}
+
+.song-title {
+    font-weight: 500;
+    color: #333;
+}
+
+.artist {
+    color: #666;
+    font-size: 0.9em;
+}
+
+.listens {
+    text-align: right;
+    font-weight: 600;
+    color: #667eea;
+}
+
+.no-results {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}

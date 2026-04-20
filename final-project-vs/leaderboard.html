@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Leaderboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <nav>
+            <ul>
+                <li><a href="leaderboard.html">Leaderboard</a></li>
+                <li><a href="import.html">Import</a></li>
+                <li><a href="info.html">Info</a></li>
+            </ul>
+        </nav>
+        <header>
+            <h1>🎸 Rock Leaderboard</h1>
+            <p class="subtitle">Top rock songs by listens</p>
+        </header>
+
+        <div class="controls">
+            <input type="text" id="searchInput" placeholder="Search songs or artists...">
+            <button onclick="resetSearch()">Reset</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 50px;">Rank</th>
+                    <th onclick="sortTable('title')">Song</th>
+                    <th onclick="sortTable('artist')">Artist</th>
+                    <th style="text-align: right; cursor: pointer;" onclick="sortTable('listens')">Listens</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+            </tbody>
+        </table>
+
+        <div id="noResults" class="no-results" style="display: none;">
+            No songs found matching your search.
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+<!-- setup a simple leaderboard where you can import data -->
