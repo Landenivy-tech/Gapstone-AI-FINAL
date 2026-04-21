@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Data</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <nav>
+            <ul>
+                <li><a href="leaderboard.html">Leaderboard</a></li>
+                <li><a href="import.html">Import</a></li>
+                <li><a href="info.html">Info</a></li>
+            </ul>
+        </nav>
+        <header>
+            <h1>📥 Import Data</h1>
+            <p class="subtitle">Import your music data here</p>
+        </header>
+
+        <div class="import-section">
+            <label for="importTextBox">Import here:</label>
+            <textarea id="importTextBox" placeholder="Paste your data here..." rows="10"></textarea>
+            <button onclick="importData()">Import</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
