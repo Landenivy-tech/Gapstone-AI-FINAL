@@ -178,6 +178,7 @@ tbody tr:hover {
     padding: 40px;
     color: #999;
 }
+
 .import-section {
     padding: 30px;
     text-align: center;
@@ -191,19 +192,19 @@ tbody tr:hover {
     margin-bottom: 15px;
 }
 
-.import-section textarea {
+.import-section input[type="text"],
+.import-section input[type="number"] {
     width: 100%;
-    padding: 15px;
+    padding: 12px 15px;
     border: 2px solid #ddd;
     border-radius: 5px;
-    font-family: 'Courier New', monospace;
-    font-size: 0.95em;
-    resize: vertical;
+    font-size: 1em;
     margin-bottom: 20px;
     transition: border-color 0.3s;
 }
 
-.import-section textarea:focus {
+.import-section input[type="text"]:focus,
+.import-section input[type="number"]:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
@@ -212,4 +213,136 @@ tbody tr:hover {
 .import-section button {
     padding: 12px 30px;
     font-size: 1em;
+    margin-right: 10px;
+    margin-bottom: 20px;
+}
+
+.import-section .import-btn {
+    background-color: #28a745;
+}
+
+.import-section .import-btn:hover {
+    background-color: #218838;
+}
+
+.import-section .clear-btn {
+    background-color: #dc3545;
+}
+
+.import-section .clear-btn:hover {
+    background-color: #c82333;
+}
+
+#songsList {
+    margin-top: 30px;
+}
+
+.import-section h3 {
+    color: #333;
+    margin-bottom: 20px;
+    font-size: 1.3em;
+}
+
+.temp-songs {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.temp-song-item {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.temp-song-item div:first-child {
+    flex-grow: 1;
+}
+
+.temp-song-item div {
+    margin: 5px 0;
+    color: #555;
+}
+
+.temp-song-item strong {
+    color: #333;
+}
+
+.temp-song-item .remove-btn {
+    padding: 8px 15px;
+    background-color: #dc3545;
+    white-space: nowrap;
+    font-size: 0.9em;
+}
+
+.temp-song-item .remove-btn:hover {
+    background-color: #c82333;
+}
+
+.info-section {
+    padding: 30px;
+}
+
+.data-stats {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    border-left: 4px solid #667eea;
+}
+
+.data-stats p {
+    margin: 10px 0;
+    font-size: 1em;
+    color: #333;
+}
+
+.info-section h3 {
+    color: #333;
+    margin-bottom: 20px;
+    font-size: 1.3em;
+}
+
+.data-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.data-item {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.data-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.data-item div {
+    margin: 5px 0;
+    color: #555;
+}
+
+.data-item strong {
+    color: #333;
+}
+
+.info-section button {
+    padding: 12px 30px;
+    font-size: 1em;
+    background-color: #dc3545;
+}
+
+.info-section button:hover {
+    background-color: #c82333;
 }

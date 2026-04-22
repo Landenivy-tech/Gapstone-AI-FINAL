@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Info</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <nav>
+            <ul>
+                <li><a href="leaderboard.html">Leaderboard</a></li>
+                <li><a href="import.html">Import</a></li>
+                <li><a href="info.html">Info</a></li>
+            </ul>
+        </nav>
+        <header>
+            <h1>📊 Data Info</h1>
+            <p class="subtitle">View your imported data</p>
+        </header>
+
+        <div class="info-section">
+            <div id="dataInfo"></div>
+            <button onclick="clearData()">Clear All Data</button>
+        </div>
+    </div>
+
+    <script>
+        function displayDataInfo() {
+            const savedData = localStorage.getItem("importedData");
+            const dataInfoDiv = document.getElementById("dataInfo");
+
+            if (!savedData) {
+                dataInfoDiv.innerHTML = "<p style='text-align: center; color: #999;'>No imported data yet. <a href='import.html'>Go to Import</a></p>";
+                return;
+            }
+
+            try {
+                const data = JSON.parse(savedData);
+
+                let html = `
+                    <div class="data-stats">
+                        <p><strong>Total Songs:</strong> ${data.length}</p>
+                        <p><strong>Total Listens:</strong> ${data.reduce((sum, song) => sum + song.listens, 0).toLocaleString()}</p>
+                        <p><strong>Average Listens:</strong> ${Math.round(data.reduce((sum, song) => sum + song.listens, 0) / data.length).toLocaleString()}</p>
+                    </div>
+                    <h3>Imported Songs:</h3>
+                    <div class="data-list">
+                `;
+
+                data.forEach((song, index) => {
+                    html += `
+                        <div class="data-item">
+                            <div><strong>${index + 1}. ${song.title}</strong></div>
+                            <div>Artist: ${song.artist}</div>
+                            <div>Listens: ${song.listens.toLocaleString()}</div>
+                        </div>
+                    `;
+                });
+
+                html += `</div>`;
+                dataInfoDiv.innerHTML = html;
+            } catch (error) {
+                dataInfoDiv.innerHTML = "<p style='color: red;'>Error loading data: " + error.message + "</p>";
+            }
+        }
+
+        function clearData() {
+            if (confirm("Are you sure you want to clear all imported data?")) {
+                localStorage.removeItem("importedData");
+                displayDataInfo();
+                alert("Data cleared!");
+            }
+        }
+
+        // Display data on page load
+        displayDataInfo();
+    </script>
+</body>
+</html>

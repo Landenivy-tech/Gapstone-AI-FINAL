@@ -17,13 +17,24 @@
         </nav>
         <header>
             <h1>📥 Import Data</h1>
-            <p class="subtitle">Import your music data here</p>
+            <p class="subtitle">Add your music data here</p>
         </header>
 
         <div class="import-section">
-            <label for="importTextBox">Import here:</label>
-            <textarea id="importTextBox" placeholder="Paste your data here..." rows="10"></textarea>
-            <button onclick="importData()">Import</button>
+            <label for="songTitle">Song Title:</label>
+            <input type="text" id="songTitle" placeholder="Enter song title...">
+
+            <label for="artistName">Artist:</label>
+            <input type="text" id="artistName" placeholder="Enter artist name...">
+
+            <label for="listensCount">Listens:</label>
+            <input type="number" id="listensCount" placeholder="Enter number of listens...">
+
+            <button onclick="addSong()">Add Song</button>
+            <button onclick="importAllSongs()" class="import-btn">Import All</button>
+            <button onclick="clearAllFields()" class="clear-btn">Clear</button>
+
+            <div id="songsList"></div>
         </div>
     </div>
 
