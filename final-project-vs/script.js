@@ -26,9 +26,38 @@ function getRankClass(rank) {
     return "rank";
 }
 
+function getImportedData() {
+    const savedData = localStorage.getItem("importedData");
+    if (!savedData) return [];
+
+    try {
+        return JSON.parse(savedData);
+    } catch (error) {
+        console.error("Error parsing imported data:", error);
+        return [];
+    }
+}
+
+function saveImportedData(data) {
+    localStorage.setItem("importedData", JSON.stringify(data));
+}
+
+function addImportedSongs(newSongs) {
+    const existing = getImportedData();
+    const combined = existing.concat(newSongs);
+    saveImportedData(combined);
+    return combined;
+}
+
+function clearImportedData() {
+    localStorage.removeItem("importedData");
+}
+
 function renderTable() {
     const tbody = document.getElementById("leaderboardBody");
     const noResults = document.getElementById("noResults");
+
+    if (!tbody) return;
 
     if (currentData.length === 0) {
         tbody.innerHTML = "";
@@ -47,18 +76,23 @@ function renderTable() {
     `).join("");
 }
 
-document.getElementById("searchInput").addEventListener("keyup", function() {
-    const searchTerm = this.value.toLowerCase();
-    currentData = songs.filter(song =>
-        song.title.toLowerCase().includes(searchTerm) ||
-        song.artist.toLowerCase().includes(searchTerm)
-    );
-    currentData.sort((a, b) => b.listens - a.listens);
-    renderTable();
-});
+const searchInput = document.getElementById("searchInput");
+if (searchInput) {
+    searchInput.addEventListener("keyup", function() {
+        const searchTerm = this.value.toLowerCase();
+        currentData = songs.filter(song =>
+            song.title.toLowerCase().includes(searchTerm) ||
+            song.artist.toLowerCase().includes(searchTerm)
+        );
+        currentData.sort((a, b) => b.listens - a.listens);
+        renderTable();
+    });
+}
 
 function resetSearch() {
-    document.getElementById("searchInput").value = "";
+    const searchElement = document.getElementById("searchInput");
+    if (!searchElement) return;
+    searchElement.value = "";
     currentData = [...songs];
     renderTable();
 }
@@ -74,26 +108,15 @@ function sortTable(field) {
     renderTable();
 }
 
-// Initial render
-renderTable();
-
-// Load imported data from localStorage on page load
 function loadImportedData() {
-    const savedData = localStorage.getItem("importedData");
-    if (savedData) {
-        try {
-            const importedData = JSON.parse(savedData);
-            // Replace the default songs with imported data
-            songs.length = 0;
-            songs.push(...importedData);
-            currentData = [...songs];
-        } catch (error) {
-            console.error("Error loading saved data:", error);
-        }
+    const importedData = getImportedData();
+    if (importedData.length > 0) {
+        songs.length = 0;
+        songs.push(...importedData);
+        currentData = [...songs];
     }
 }
 
-// Call this on leaderboard page
 if (document.getElementById("leaderboardBody")) {
     loadImportedData();
     renderTable();
@@ -128,7 +151,6 @@ function addSong() {
     tempSongs.push(song);
     displaySongsList();
 
-    // Clear the input fields
     document.getElementById("songTitle").value = "";
     document.getElementById("artistName").value = "";
     document.getElementById("listensCount").value = "";
@@ -137,6 +159,7 @@ function addSong() {
 
 function displaySongsList() {
     const songsList = document.getElementById("songsList");
+    if (!songsList) return;
 
     if (tempSongs.length === 0) {
         songsList.innerHTML = "";
@@ -172,17 +195,13 @@ function importAllSongs() {
     }
 
     const songsCount = tempSongs.length;
+    addImportedSongs(tempSongs);
 
-    // Store imported data in localStorage
-    localStorage.setItem("importedData", JSON.stringify(tempSongs));
-
-    // Clear temp data
     tempSongs = [];
     displaySongsList();
 
     alert(`Successfully imported ${songsCount} songs! Redirecting to info page...`);
 
-    // Redirect to info page after a short delay
     setTimeout(() => {
         window.location.href = "info.html";
     }, 1000);
@@ -196,4 +215,50 @@ function clearAllFields() {
         tempSongs = [];
         displaySongsList();
     }
+}
+
+function displayDataInfo() {
+    const dataInfoDiv = document.getElementById("dataInfo");
+    if (!dataInfoDiv) return;
+
+    const data = getImportedData();
+    if (data.length === 0) {
+        dataInfoDiv.innerHTML = "<p style='text-align: center; color: #999;'>No imported data yet. <a href='import.html'>Go to Import</a></p>";
+        return;
+    }
+
+    let html = `
+        <div class="data-stats">
+            <p><strong>Total Songs:</strong> ${data.length}</p>
+            <p><strong>Total Listens:</strong> ${data.reduce((sum, song) => sum + Number(song.listens), 0).toLocaleString()}</p>
+            <p><strong>Average Listens:</strong> ${Math.round(data.reduce((sum, song) => sum + Number(song.listens), 0) / data.length).toLocaleString()}</p>
+        </div>
+        <h3>Imported Songs:</h3>
+        <div class="data-list">
+    `;
+
+    data.forEach((song, index) => {
+        html += `
+            <div class="data-item">
+                <div><strong>${index + 1}. ${song.title}</strong></div>
+                <div>Artist: ${song.artist}</div>
+                <div>Listens: ${Number(song.listens).toLocaleString()}</div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    dataInfoDiv.innerHTML = html;
+}
+
+function clearData() {
+    if (confirm("Are you sure you want to clear all imported data?")) {
+        clearImportedData();
+        displayDataInfo();
+        alert("Data cleared!");
+    }
+}
+
+if (document.getElementById("dataInfo")) {
+    displayDataInfo();
 }
