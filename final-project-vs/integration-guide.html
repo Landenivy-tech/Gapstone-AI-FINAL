@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integration Guide</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+            line-height: 1.6;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; }
+        h2 { color: #764ba2; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .example {
+            background: #f0f0f0;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .nav {
+            background: white;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .nav a {
+            margin-right: 20px;
+            text-decoration: none;
+            color: #667eea;
+            font-weight: bold;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .note {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .warning {
+            background: #fff3e0;
+            border-left: 4px solid #FF9800;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #667eea;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <strong>Navigation:</strong>
+        <a href="/">Home (Leaderboard)</a>
+        <a href="/import">Import</a>
+        <a href="/info">Info</a>
+        <a href="/user-database-example.html">Database Example</a>
+        <a href="/integration-guide.html">Integration Guide</a>
+    </div>
+
+    <div class="section">
+        <h1>📖 Database Integration Guide</h1>
+        <p>Learn how to add user authentication and data storage to your existing pages.</p>
+    </div>
+
+    <div class="section">
+        <h2>Step 1: Include the Database Client</h2>
+        <p>Add this line to the <code>&lt;head&gt;</code> section of your HTML file:</p>
+        <pre>&lt;script src="db-client.js"&gt;&lt;/script&gt;</pre>
+        <p>This gives you access to the global <code>db</code> object.</p>
+    </div>
+
+    <div class="section">
+        <h2>Step 2: Add a Login Section</h2>
+        <p>Create a login form in your HTML:</p>
+        <pre>&lt;div id="loginForm"&gt;
+    &lt;input type="text" id="username" placeholder="Username"&gt;
+    &lt;input type="password" id="password" placeholder="Password"&gt;
+    &lt;button onclick="login()"&gt;Login&lt;/button&gt;
+&lt;/div&gt;
+
+&lt;div id="userGreeting" style="display:none;"&gt;
+    Welcome, &lt;span id="userName"&gt;&lt;/span&gt;!
+    &lt;button onclick="logout()"&gt;Logout&lt;/button&gt;
+&lt;/div&gt;</pre>
+    </div>
+
+    <div class="section">
+        <h2>Step 3: Add JavaScript Functions</h2>
+        <pre>&lt;script&gt;
+// Check if user is logged in on page load
+window.onload = () =&gt; {
+    if (db.isLoggedIn()) {
+        showUserGreeting();
+    }
+};
+
+// Show user greeting
+function showUserGreeting() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('userGreeting').style.display = 'block';
+    document.getElementById('userName').textContent = db.username;
+}
+
+// Login function
+async function login() {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    
+    const result = await db.login(username, password);
+    if (result.userId) {
+        showUserGreeting();
+    } else {
+        alert('Login failed: ' + result.error);
+    }
+}
+
+// Logout function
+function logout() {
+    db.logout();
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('userGreeting').style.display = 'none';
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+}
+&lt;/script&gt;</pre>
+    </div>
+
+    <div class="section">
+        <h2>Step 4: Save User-Specific Data</h2>
+        <p>Store data tied to the logged-in user:</p>
+        <pre>&lt;button onclick="saveFavoriteSong()"&gt;Save Favorite Song&lt;/button&gt;
+
+&lt;script&gt;
+async function saveFavoriteSong() {
+    if (!db.isLoggedIn()) {
+        alert('Please login first');
+        return;
+    }
+    
+    const song = prompt('Enter your favorite song:');
+    if (song) {
+        await db.saveData('favorite_song', song);
+        alert('Saved!');
+    }
+}
+
+// Load user data
+async function loadUserData() {
+    if (!db.isLoggedIn()) return;
+    
+    const favSong = await db.getData('favorite_song');
+    if (favSong) {
+        console.log('Your favorite song:', favSong.data_value);
+    }
+}
+&lt;/script&gt;</pre>
+    </div>
+
+    <div class="section">
+        <h2>Common Tasks Reference</h2>
+        
+        <h3>Check if User is Logged In</h3>
+        <pre>if (db.isLoggedIn()) {
+    console.log('User:', db.username);
+} else {
+    console.log('Not logged in');
+}</pre>
+
+        <h3>Save Different Types of Data</h3>
+        <pre>// Save simple text
+await db.saveData('bio', 'I love music');
+
+// Save a number
+await db.saveData('high_score', '9500');
+
+// Save JSON object
+await db.saveObject('preferences', {
+    theme: 'dark',
+    notifications: true
+});
+
+// Save array
+await db.saveObject('favorite_songs', [
+    'Song 1',
+    'Song 2',
+    'Song 3'
+]);</pre>
+
+        <h3>Retrieve Data</h3>
+        <pre>// Get specific data
+const bio = await db.getData('bio');
+console.log(bio.data_value);
+
+// Get parsed object
+const prefs = await db.getObject('preferences');
+console.log(prefs.theme);
+
+// Get all user data
+const allData = await db.getAllData();
+allData.forEach(item =&gt; {
+    console.log(item.data_key + ': ' + item.data_value);
+});</pre>
+
+        <h3>Delete Data</h3>
+        <pre>await db.deleteData('high_score');</pre>
+
+        <h3>Handle Errors</h3>
+        <pre>async function loginSafely() {
+    try {
+        const result = await db.login(username, password);
+        if (!result.userId) {
+            console.error('Login failed:', result.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}</pre>
+    </div>
+
+    <div class="section">
+        <h2>Integration Examples by Page</h2>
+
+        <h3>Leaderboard Page</h3>
+        <p>Add user-specific scores to the leaderboard:</p>
+        <pre>// Save user's score
+async function submitScore(score) {
+    if (!db.isLoggedIn()) {
+        alert('Please login to submit a score');
+        return;
+    }
+    await db.saveData('leaderboard_score', score);
+    await db.saveData('last_submitted', new Date().toLocaleString());
+}
+
+// Load user's score
+async function loadUserScore() {
+    const scoreData = await db.getData('leaderboard_score');
+    if (scoreData) {
+        document.getElementById('userScore').textContent = scoreData.data_value;
+    }
+}</pre>
+
+        <h3>Import Page</h3>
+        <p>Save import history per user:</p>
+        <pre>async function saveImportHistory(songCount) {
+    if (!db.isLoggedIn()) return;
+    
+    await db.saveObject('last_import', {
+        count: songCount,
+        date: new Date().toLocaleString()
+    });
+}</pre>
+
+        <h3>Info Page</h3>
+        <p>Display user profile information:</p>
+        <pre>async function displayUserInfo() {
+    if (!db.isLoggedIn()) return;
+    
+    const profile = await db.getUserProfile();
+    const allData = await db.getAllData();
+    
+    console.log('Profile:', profile);
+    console.log('Saved Data:', allData);
+}</pre>
+    </div>
+
+    <div class="section">
+        <h2>Useful Data Storage Ideas</h2>
+        <table>
+            <tr>
+                <th>Use Case</th>
+                <th>Key</th>
+                <th>Example Value</th>
+            </tr>
+            <tr>
+                <td>User Profile Picture</td>
+                <td>profile_pic_url</td>
+                <td>/images/user.jpg</td>
+            </tr>
+            <tr>
+                <td>Theme Preference</td>
+                <td>theme</td>
+                <td>dark</td>
+            </tr>
+            <tr>
+                <td>Favorite Songs</td>
+                <td>favorites</td>
+                <td>["Song1", "Song2"]</td>
+            </tr>
+            <tr>
+                <td>High Score</td>
+                <td>high_score</td>
+                <td>9500</td>
+            </tr>
+            <tr>
+                <td>Last Visited</td>
+                <td>last_visited</td>
+                <td>2026-04-23 14:30:00</td>
+            </tr>
+            <tr>
+                <td>User Bio</td>
+                <td>bio</td>
+                <td>I love music</td>
+            </tr>
+            <tr>
+                <td>Notification Settings</td>
+                <td>notifications</td>
+                <td>{"email":true,"sms":false}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="note">
+        <strong>💡 Tip:</strong> The <code>db</code> object automatically saves the user ID and username to browser storage. This persists even after the user closes the browser, so they'll stay logged in!
+    </div>
+
+    <div class="warning">
+        <strong>⚠️ Remember:</strong> Always check <code>db.isLoggedIn()</code> before trying to save or retrieve user data.
+    </div>
+
+    <div class="section">
+        <h2>API Methods Quick Reference</h2>
+        <table>
+            <tr>
+                <th>Method</th>
+                <th>Parameters</th>
+                <th>Returns</th>
+                <th>Example</th>
+            </tr>
+            <tr>
+                <td><code>db.login(username, password)</code></td>
+                <td>string, string</td>
+                <td>Promise&lt;Object&gt;</td>
+                <td><code>await db.login('john', 'pass123')</code></td>
+            </tr>
+            <tr>
+                <td><code>db.register(username, email, password)</code></td>
+                <td>string, string, string</td>
+                <td>Promise&lt;Object&gt;</td>
+                <td><code>await db.register('john', 'j@ex.com', 'pass123')</code></td>
+            </tr>
+            <tr>
+                <td><code>db.logout()</code></td>
+                <td>none</td>
+                <td>void</td>
+                <td><code>db.logout()</code></td>
+            </tr>
+            <tr>
+                <td><code>db.isLoggedIn()</code></td>
+                <td>none</td>
+                <td>boolean</td>
+                <td><code>if (db.isLoggedIn()) {...}</code></td>
+            </tr>
+            <tr>
+                <td><code>db.saveData(key, value)</code></td>
+                <td>string, string</td>
+                <td>Promise&lt;Object&gt;</td>
+                <td><code>await db.saveData('bio', 'Hello')</code></td>
+            </tr>
+            <tr>
+                <td><code>db.getData(key)</code></td>
+                <td>string</td>
+                <td>Promise&lt;Object|null&gt;</td>
+                <td><code>const data = await db.getData('bio')</code></td>
+            </tr>
+            <tr>
+                <td><code>db.getAllData()</code></td>
+                <td>none</td>
+                <td>Promise&lt;Array&gt;</td>
+                <td><code>const all = await db.getAllData()</code></td>
+            </tr>
+            <tr>
+                <td><code>db.deleteData(key)</code></td>
+                <td>string</td>
+                <td>Promise&lt;Object&gt;</td>
+                <td><code>await db.deleteData('bio')</code></td>
+            </tr>
+            <tr>
+                <td><code>db.saveObject(key, obj)</code></td>
+                <td>string, Object</td>
+                <td>Promise&lt;Object&gt;</td>
+                <td><code>await db.saveObject('prefs', {theme:'dark'})</code></td>
+            </tr>
+            <tr>
+                <td><code>db.getObject(key)</code></td>
+                <td>string</td>
+                <td>Promise&lt;Object|null&gt;</td>
+                <td><code>const obj = await db.getObject('prefs')</code></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Need More Help?</h2>
+        <ul>
+            <li>📖 See <a href="DATABASE.md">DATABASE.md</a> for complete API documentation</li>
+            <li>📚 Visit <a href="/user-database-example.html">user-database-example.html</a> for a working example</li>
+            <li>🚀 Read <a href="QUICKSTART.md">QUICKSTART.md</a> for setup instructions</li>
+        </ul>
+    </div>
+</body>
+</html>

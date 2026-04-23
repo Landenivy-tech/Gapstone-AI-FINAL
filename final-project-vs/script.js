@@ -26,31 +26,69 @@ function getRankClass(rank) {
     return "rank";
 }
 
-function getImportedData() {
-    const savedData = localStorage.getItem("importedData");
-    if (!savedData) return [];
-
+async function getImportedData() {
     try {
-        return JSON.parse(savedData);
+        const response = await fetch('/api/songs');
+        if (!response.ok) throw new Error('Failed to fetch songs');
+        return await response.json();
     } catch (error) {
-        console.error("Error parsing imported data:", error);
-        return [];
+        console.log('API not available, using localStorage');
+        const savedData = localStorage.getItem("importedData");
+        if (!savedData) return [];
+        try {
+            return JSON.parse(savedData);
+        } catch (e) {
+            return [];
+        }
     }
 }
 
-function saveImportedData(data) {
-    localStorage.setItem("importedData", JSON.stringify(data));
+async function saveImportedData(data) {
+    try {
+        const response = await fetch('/api/songs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ songs: data })
+        });
+        if (!response.ok) throw new Error('Failed to save songs');
+        return await response.json();
+    } catch (error) {
+        console.log('API not available, using localStorage');
+        localStorage.setItem("importedData", JSON.stringify(data));
+        return { message: 'Saved to localStorage' };
+    }
 }
 
-function addImportedSongs(newSongs) {
-    const existing = getImportedData();
-    const combined = existing.concat(newSongs);
-    saveImportedData(combined);
-    return combined;
+async function addImportedSongs(newSongs) {
+    return await saveImportedData(newSongs);
 }
 
-function clearImportedData() {
-    localStorage.removeItem("importedData");
+async function clearImportedData() {
+    try {
+        const response = await fetch('/api/songs', { method: 'DELETE' });
+        if (!response.ok) throw new Error('Failed to clear songs');
+        return await response.json();
+    } catch (error) {
+        console.log('API not available, using localStorage');
+        localStorage.removeItem("importedData");
+        return { message: 'Cleared localStorage' };
+    }
+}
+
+async function getStats() {
+    try {
+        const response = await fetch('/api/stats');
+        if (!response.ok) throw new Error('Failed to fetch stats');
+        return await response.json();
+    } catch (error) {
+        console.log('API not available, calculating from localStorage');
+        const data = await getImportedData();
+        return {
+            totalSongs: data.length,
+            totalListens: data.reduce((sum, song) => sum + Number(song.listens), 0),
+            avgListens: data.length > 0 ? Math.round(data.reduce((sum, song) => sum + Number(song.listens), 0) / data.length) : 0
+        };
+    }
 }
 
 function renderTable() {
@@ -108,8 +146,8 @@ function sortTable(field) {
     renderTable();
 }
 
-function loadImportedData() {
-    const importedData = getImportedData();
+async function loadImportedData() {
+    const importedData = await getImportedData();
     if (importedData.length > 0) {
         songs.length = 0;
         songs.push(...importedData);
@@ -118,7 +156,6 @@ function loadImportedData() {
 }
 
 if (document.getElementById("leaderboardBody")) {
-    loadImportedData();
     renderTable();
 }
 
@@ -188,23 +225,23 @@ function removeSong(index) {
     displaySongsList();
 }
 
-function importAllSongs() {
+async function importAllSongs() {
     if (tempSongs.length === 0) {
         alert("Please add at least one song before importing");
         return;
     }
 
     const songsCount = tempSongs.length;
-    addImportedSongs(tempSongs);
 
-    tempSongs = [];
-    displaySongsList();
-
-    alert(`Successfully imported ${songsCount} songs! Redirecting to info page...`);
-
-    setTimeout(() => {
+    try {
+        await addImportedSongs(tempSongs);
+        tempSongs = [];
+        displaySongsList();
+        alert(`Successfully imported ${songsCount} songs!`);
         window.location.href = "info.html";
-    }, 1000);
+    } catch (error) {
+        alert("Error importing songs. Please try again.");
+    }
 }
 
 function clearAllFields() {
@@ -217,45 +254,54 @@ function clearAllFields() {
     }
 }
 
-function displayDataInfo() {
+async function displayDataInfo() {
     const dataInfoDiv = document.getElementById("dataInfo");
     if (!dataInfoDiv) return;
 
-    const data = getImportedData();
-    if (data.length === 0) {
-        dataInfoDiv.innerHTML = "<p style='text-align: center; color: #999;'>No imported data yet. <a href='import.html'>Go to Import</a></p>";
-        return;
-    }
+    try {
+        const [data, stats] = await Promise.all([getImportedData(), getStats()]);
 
-    let html = `
-        <div class="data-stats">
-            <p><strong>Total Songs:</strong> ${data.length}</p>
-            <p><strong>Total Listens:</strong> ${data.reduce((sum, song) => sum + Number(song.listens), 0).toLocaleString()}</p>
-            <p><strong>Average Listens:</strong> ${Math.round(data.reduce((sum, song) => sum + Number(song.listens), 0) / data.length).toLocaleString()}</p>
-        </div>
-        <h3>Imported Songs:</h3>
-        <div class="data-list">
-    `;
+        if (data.length === 0) {
+            dataInfoDiv.innerHTML = "<p style='text-align: center; color: #999;'>No imported data yet. <a href='import.html'>Go to Import</a></p>";
+            return;
+        }
 
-    data.forEach((song, index) => {
-        html += `
-            <div class="data-item">
-                <div><strong>${index + 1}. ${song.title}</strong></div>
-                <div>Artist: ${song.artist}</div>
-                <div>Listens: ${Number(song.listens).toLocaleString()}</div>
+        let html = `
+            <div class="data-stats">
+                <p><strong>Total Songs:</strong> ${stats.totalSongs}</p>
+                <p><strong>Total Listens:</strong> ${stats.totalListens.toLocaleString()}</p>
+                <p><strong>Average Listens:</strong> ${stats.avgListens.toLocaleString()}</p>
             </div>
+            <h3>Imported Songs:</h3>
+            <div class="data-list">
         `;
-    });
 
-    html += `</div>`;
-    dataInfoDiv.innerHTML = html;
+        data.forEach((song, index) => {
+            html += `
+                <div class="data-item">
+                    <div><strong>${index + 1}. ${song.title}</strong></div>
+                    <div>Artist: ${song.artist}</div>
+                    <div>Listens: ${Number(song.listens).toLocaleString()}</div>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        dataInfoDiv.innerHTML = html;
+    } catch (error) {
+        dataInfoDiv.innerHTML = "<p style='color: red;'>Error loading data. Please try again.</p>";
+    }
 }
 
-function clearData() {
+async function clearData() {
     if (confirm("Are you sure you want to clear all imported data?")) {
-        clearImportedData();
-        displayDataInfo();
-        alert("Data cleared!");
+        try {
+            await clearImportedData();
+            await displayDataInfo();
+            alert("Data cleared!");
+        } catch (error) {
+            alert("Error clearing data. Please try again.");
+        }
     }
 }
 
