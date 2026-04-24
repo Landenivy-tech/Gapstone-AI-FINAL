@@ -16,11 +16,19 @@
             </ul>
         </nav>
         <header>
-            <h1>📥 Import Data</h1>
-            <p class="subtitle">Add your music data here</p>
+            <h1>📥 Import Data to Database</h1>
+            <p class="subtitle">Add your music data - songs will be saved to the database</p>
+            <div class="database-notice">
+                <strong>💾 Database Storage:</strong> All imported songs are saved to the server database and will persist across sessions.
+            </div>
         </header>
 
         <div class="import-section">
+            <div id="dbStatus" class="db-status">
+                <span id="statusIcon">🔄</span>
+                <span id="statusText">Checking database connection...</span>
+            </div>
+
             <label for="songTitle">Song Title:</label>
             <input type="text" id="songTitle" placeholder="Enter song title...">
 
@@ -39,5 +47,33 @@
     </div>
 
     <script src="script.js"></script>
+    <script>
+        // Check database connection on page load
+        window.addEventListener('DOMContentLoaded', async function() {
+            await checkDatabaseConnection();
+        });
+
+        async function checkDatabaseConnection() {
+            const statusDiv = document.getElementById('dbStatus');
+            const statusIcon = document.getElementById('statusIcon');
+            const statusText = document.getElementById('statusText');
+
+            try {
+                const response = await fetch('/api/stats');
+                if (response.ok) {
+                    statusDiv.className = 'db-status connected';
+                    statusIcon.textContent = '✅';
+                    statusText.textContent = 'Database connected - songs will be saved permanently';
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                statusDiv.className = 'db-status error';
+                statusIcon.textContent = '❌';
+                statusText.textContent = 'Database not available - imports will fail';
+                console.error('Database connection check failed:', error);
+            }
+        }
+    </script>
 </body>
 </html>

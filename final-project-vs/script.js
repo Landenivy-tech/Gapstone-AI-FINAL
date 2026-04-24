@@ -27,35 +27,62 @@ function getRankClass(rank) {
 }
 
 async function getImportedData() {
+    // Always try to get from database first
     try {
         const response = await fetch('/api/songs');
-        if (!response.ok) throw new Error('Failed to fetch songs');
-        return await response.json();
+        if (!response.ok) {
+            throw new Error(`Database fetch failed: ${response.status} ${response.statusText}`);
+        }
+        const data = await response.json();
+        console.log('✅ Loaded data from database:', data.length, 'songs');
+        return data;
     } catch (error) {
-        console.log('API not available, using localStorage');
+        console.error('❌ Database fetch failed:', error);
+
+        // Only fall back to localStorage if database is completely unavailable
+        console.log('⚠️ Falling back to localStorage...');
         const savedData = localStorage.getItem("importedData");
-        if (!savedData) return [];
+        if (!savedData) {
+            console.log('No localStorage data found either');
+            return [];
+        }
+
         try {
-            return JSON.parse(savedData);
-        } catch (e) {
+            const data = JSON.parse(savedData);
+            console.log('Loaded data from localStorage:', data.length, 'songs');
+            return data;
+        } catch (parseError) {
+            console.error('Failed to parse localStorage data:', parseError);
             return [];
         }
     }
 }
 
 async function saveImportedData(data) {
+    // Always try to save to database first
     try {
         const response = await fetch('/api/songs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ songs: data })
         });
-        if (!response.ok) throw new Error('Failed to save songs');
-        return await response.json();
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`Database save failed: ${response.status} ${response.statusText} - ${errorData.error || 'Unknown error'}`);
+        }
+
+        const result = await response.json();
+        console.log('✅ Successfully saved to database:', result);
+        return result;
     } catch (error) {
-        console.log('API not available, using localStorage');
-        localStorage.setItem("importedData", JSON.stringify(data));
-        return { message: 'Saved to localStorage' };
+        console.error('❌ Database save failed:', error);
+
+        // Show user-friendly error message
+        alert(`Failed to save to database: ${error.message}\n\nPlease make sure the server is running and try again.`);
+
+        // Re-throw error so calling function knows it failed
+        throw error;
     }
 }
 
@@ -64,30 +91,58 @@ async function addImportedSongs(newSongs) {
 }
 
 async function clearImportedData() {
+    // Always try to clear from database first
     try {
         const response = await fetch('/api/songs', { method: 'DELETE' });
-        if (!response.ok) throw new Error('Failed to clear songs');
-        return await response.json();
-    } catch (error) {
-        console.log('API not available, using localStorage');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`Database clear failed: ${response.status} ${response.statusText} - ${errorData.error || 'Unknown error'}`);
+        }
+
+        const result = await response.json();
+        console.log('✅ Successfully cleared database:', result);
+
+        // Also clear localStorage as backup
         localStorage.removeItem("importedData");
-        return { message: 'Cleared localStorage' };
+        return result;
+    } catch (error) {
+        console.error('❌ Database clear failed:', error);
+
+        // Only clear localStorage if database clear failed
+        console.log('⚠️ Clearing localStorage instead...');
+        localStorage.removeItem("importedData");
+        return { message: 'Cleared localStorage (database clear failed)' };
     }
 }
 
 async function getStats() {
+    // Always try to get stats from database first
     try {
         const response = await fetch('/api/stats');
-        if (!response.ok) throw new Error('Failed to fetch stats');
-        return await response.json();
+        if (!response.ok) {
+            throw new Error(`Database stats failed: ${response.status} ${response.statusText}`);
+        }
+        const stats = await response.json();
+        console.log('✅ Loaded stats from database:', stats);
+        return stats;
     } catch (error) {
-        console.log('API not available, calculating from localStorage');
-        const data = await getImportedData();
-        return {
-            totalSongs: data.length,
-            totalListens: data.reduce((sum, song) => sum + Number(song.listens), 0),
-            avgListens: data.length > 0 ? Math.round(data.reduce((sum, song) => sum + Number(song.listens), 0) / data.length) : 0
-        };
+        console.error('❌ Database stats failed:', error);
+
+        // Fall back to calculating from localStorage data
+        console.log('⚠️ Calculating stats from localStorage...');
+        try {
+            const data = await getImportedData();
+            const stats = {
+                totalSongs: data.length,
+                totalListens: data.reduce((sum, song) => sum + Number(song.listens), 0),
+                avgListens: data.length > 0 ? Math.round(data.reduce((sum, song) => sum + Number(song.listens), 0) / data.length) : 0
+            };
+            console.log('Calculated stats from localStorage:', stats);
+            return stats;
+        } catch (calcError) {
+            console.error('Failed to calculate stats:', calcError);
+            return { totalSongs: 0, totalListens: 0, avgListens: 0 };
+        }
     }
 }
 
@@ -233,14 +288,35 @@ async function importAllSongs() {
 
     const songsCount = tempSongs.length;
 
+    // Show loading message
+    const importBtn = document.querySelector('.import-btn');
+    const originalText = importBtn.textContent;
+    importBtn.textContent = 'Importing...';
+    importBtn.disabled = true;
+
     try {
-        await addImportedSongs(tempSongs);
+        console.log('🚀 Starting import of', songsCount, 'songs to database...');
+
+        const result = await addImportedSongs(tempSongs);
+
+        // Success!
         tempSongs = [];
         displaySongsList();
-        alert(`Successfully imported ${songsCount} songs!`);
-        window.location.href = "info.html";
+
+        console.log('✅ Import successful:', result);
+        alert(`✅ Successfully imported ${songsCount} songs to database!\n\nYou can now view them on the leaderboard.`);
+
+        // Redirect to leaderboard to show the imported songs
+        window.location.href = "leaderboard.html";
+
     } catch (error) {
-        alert("Error importing songs. Please try again.");
+        console.error('❌ Import failed:', error);
+        alert(`❌ Failed to import songs to database:\n\n${error.message}\n\nPlease make sure the server is running and try again.`);
+
+    } finally {
+        // Reset button
+        importBtn.textContent = originalText;
+        importBtn.disabled = false;
     }
 }
 
@@ -294,13 +370,16 @@ async function displayDataInfo() {
 }
 
 async function clearData() {
-    if (confirm("Are you sure you want to clear all imported data?")) {
+    if (confirm("⚠️ Are you sure you want to clear ALL imported songs from the database?\n\nThis action cannot be undone!")) {
         try {
-            await clearImportedData();
+            console.log('🗑️ Clearing all data from database...');
+            const result = await clearImportedData();
             await displayDataInfo();
-            alert("Data cleared!");
+            console.log('✅ Database cleared:', result);
+            alert("✅ All songs have been cleared from the database!");
         } catch (error) {
-            alert("Error clearing data. Please try again.");
+            console.error('❌ Failed to clear database:', error);
+            alert(`❌ Failed to clear data from database:\n\n${error.message}\n\nPlease make sure the server is running.`);
         }
     }
 }
