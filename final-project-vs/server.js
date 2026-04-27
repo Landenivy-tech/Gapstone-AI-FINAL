@@ -1,5 +1,5 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const Datastore = require('nedb');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
@@ -13,67 +13,12 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname)));
 
-// Database setup
-const db = new sqlite3.Database('./songs.db', (err) => {
-    if (err) {
-        console.error('Error opening database:', err.message);
-    } else {
-        console.log('Connected to SQLite database.');
-        createTable();
-    }
-});
+// Database setup with NeDB
+const usersDB = new Datastore({ filename: './users.db', autoload: true });
+const userDataDB = new Datastore({ filename: './user_data.db', autoload: true });
+const songsDB = new Datastore({ filename: './songs.db', autoload: true });
 
-// Create songs table
-function createTable() {
-    // Create users table
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        last_login DATETIME
-    )`, (err) => {
-        if (err) {
-            console.error('Error creating users table:', err.message);
-        } else {
-            console.log('Users table ready.');
-        }
-    });
-
-    // Create user_data table for storing user-specific data
-    db.run(`CREATE TABLE IF NOT EXISTS user_data (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        data_key TEXT NOT NULL,
-        data_value TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        UNIQUE(user_id, data_key)
-    )`, (err) => {
-        if (err) {
-            console.error('Error creating user_data table:', err.message);
-        } else {
-            console.log('User_data table ready.');
-        }
-    });
-
-    // Create songs table
-    db.run(`CREATE TABLE IF NOT EXISTS songs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        artist TEXT NOT NULL,
-        listens INTEGER NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`, (err) => {
-        if (err) {
-            console.error('Error creating table:', err.message);
-        } else {
-            console.log('Songs table ready.');
-        }
-    });
-}
+console.log('Connected to NeDB databases.');
 
 // Helper function to hash passwords
 function hashPassword(password) {
@@ -94,23 +39,38 @@ app.post('/api/auth/register', (req, res) => {
 
     const hashedPassword = hashPassword(password);
 
-    db.run('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-        [username, email, hashedPassword],
-        function(err) {
+    // Check if user already exists
+    usersDB.findOne({ $or: [{ username: username }, { email: email }] }, (err, existingUser) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (existingUser) {
+            return res.status(400).json({ error: 'Username or email already exists' });
+        }
+
+        // Create new user
+        const newUser = {
+            username: username,
+            email: email,
+            password: hashedPassword,
+            created_at: new Date(),
+            last_login: null
+        };
+
+        usersDB.insert(newUser, (err, insertedUser) => {
             if (err) {
-                if (err.message.includes('UNIQUE constraint failed')) {
-                    return res.status(400).json({ error: 'Username or email already exists' });
-                }
                 return res.status(500).json({ error: err.message });
             }
-            res.json({ 
+
+            res.json({
                 message: 'User registered successfully',
-                userId: this.lastID,
-                username: username,
-                email: email
+                userId: insertedUser._id,
+                username: insertedUser.username,
+                email: insertedUser.email
             });
-        }
-    );
+        });
+    });
 });
 
 // Login user
@@ -123,37 +83,46 @@ app.post('/api/auth/login', (req, res) => {
 
     const hashedPassword = hashPassword(password);
 
-    db.get('SELECT id, username, email FROM users WHERE username = ? AND password = ?',
-        [username, hashedPassword],
-        (err, row) => {
-            if (err) {
-                return res.status(500).json({ error: err.message });
-            }
-
-            if (!row) {
-                return res.status(401).json({ error: 'Invalid username or password' });
-            }
-
-            // Update last login
-            db.run('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [row.id]);
-
-            res.json({
-                message: 'Login successful',
-                userId: row.id,
-                username: row.username,
-                email: row.email
-            });
+    usersDB.findOne({ username: username, password: hashedPassword }, (err, user) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
         }
-    );
+
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid username or password' });
+        }
+
+        // Update last login
+        usersDB.update({ _id: user._id }, { $set: { last_login: new Date() } }, {}, (err) => {
+            if (err) {
+                console.error('Error updating last login:', err);
+            }
+        });
+
+        res.json({
+            message: 'Login successful',
+            userId: user._id,
+            username: user.username,
+            email: user.email
+        });
+    });
 });
 
 // Get all users
 app.get('/api/users', (req, res) => {
-    db.all('SELECT id, username, email, created_at, last_login FROM users', [], (err, rows) => {
+    usersDB.find({}, (err, users) => {
         if (err) {
             return res.status(500).json({ error: err.message });
         }
-        res.json(rows);
+        // Transform NeDB format to match expected format
+        const transformedUsers = users.map(user => ({
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            created_at: user.created_at,
+            last_login: user.last_login
+        }));
+        res.json(transformedUsers);
     });
 });
 
@@ -161,18 +130,22 @@ app.get('/api/users', (req, res) => {
 app.get('/api/users/:userId', (req, res) => {
     const userId = req.params.userId;
 
-    db.get('SELECT id, username, email, created_at, last_login FROM users WHERE id = ?', 
-        [userId], 
-        (err, row) => {
-            if (err) {
-                return res.status(500).json({ error: err.message });
-            }
-            if (!row) {
-                return res.status(404).json({ error: 'User not found' });
-            }
-            res.json(row);
+    usersDB.findOne({ _id: userId }, (err, user) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
         }
-    );
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        // Transform NeDB format to match expected format
+        res.json({
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            created_at: user.created_at,
+            last_login: user.last_login
+        });
+    });
 });
 
 // ========== USER DATA ROUTES ==========
@@ -186,76 +159,112 @@ app.post('/api/users/:userId/data', (req, res) => {
         return res.status(400).json({ error: 'Key and value required' });
     }
 
-    db.run(`INSERT INTO user_data (user_id, data_key, data_value, updated_at) 
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(user_id, data_key) 
-            DO UPDATE SET data_value = ?, updated_at = CURRENT_TIMESTAMP`,
-        [userId, key, value, value],
-        function(err) {
-            if (err) {
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: 'Data saved successfully', key: key, value: value });
+    // Check if data already exists
+    userDataDB.findOne({ user_id: userId, data_key: key }, (err, existingData) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
         }
-    );
+
+        const now = new Date();
+
+        if (existingData) {
+            // Update existing data
+            userDataDB.update(
+                { _id: existingData._id },
+                { $set: { data_value: value, updated_at: now } },
+                {},
+                (err) => {
+                    if (err) {
+                        return res.status(500).json({ error: err.message });
+                    }
+                    res.json({ message: 'Data saved successfully', key: key, value: value });
+                }
+            );
+        } else {
+            // Insert new data
+            const newData = {
+                user_id: userId,
+                data_key: key,
+                data_value: value,
+                created_at: now,
+                updated_at: now
+            };
+
+            userDataDB.insert(newData, (err) => {
+                if (err) {
+                    return res.status(500).json({ error: err.message });
+                }
+                res.json({ message: 'Data saved successfully', key: key, value: value });
+            });
+        }
+    });
 });
 
 // Get user data by key
 app.get('/api/users/:userId/data/:key', (req, res) => {
     const { userId, key } = req.params;
 
-    db.get('SELECT * FROM user_data WHERE user_id = ? AND data_key = ?', 
-        [userId, key], 
-        (err, row) => {
-            if (err) {
-                return res.status(500).json({ error: err.message });
-            }
-            if (!row) {
-                return res.status(404).json({ error: 'Data not found' });
-            }
-            res.json(row);
+    userDataDB.findOne({ user_id: userId, data_key: key }, (err, row) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
         }
-    );
+        if (!row) {
+            return res.status(404).json({ error: 'Data not found' });
+        }
+        res.json({
+            key: row.data_key,
+            value: row.data_value,
+            created_at: row.created_at,
+            updated_at: row.updated_at
+        });
+    });
 });
 
 // Get all user data
 app.get('/api/users/:userId/data', (req, res) => {
     const userId = req.params.userId;
 
-    db.all('SELECT data_key, data_value, created_at, updated_at FROM user_data WHERE user_id = ? ORDER BY updated_at DESC',
-        [userId],
-        (err, rows) => {
-            if (err) {
-                return res.status(500).json({ error: err.message });
-            }
-            res.json(rows);
+    userDataDB.find({ user_id: userId }).sort({ updated_at: -1 }).exec((err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
         }
-    );
+        const data = rows.map(row => ({
+            key: row.data_key,
+            value: row.data_value,
+            created_at: row.created_at,
+            updated_at: row.updated_at
+        }));
+        res.json(data);
+    });
 });
 
 // Delete user data
 app.delete('/api/users/:userId/data/:key', (req, res) => {
     const { userId, key } = req.params;
 
-    db.run('DELETE FROM user_data WHERE user_id = ? AND data_key = ?',
-        [userId, key],
-        function(err) {
-            if (err) {
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: 'Data deleted successfully', deletedRows: this.changes });
+    userDataDB.remove({ user_id: userId, data_key: key }, {}, (err, numRemoved) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
         }
-    );
+        res.json({ message: 'Data deleted successfully', deletedRows: numRemoved });
+    });
 });
 
 // ========== SONGS ROUTES ==========
 app.get('/api/songs', (req, res) => {
-    db.all('SELECT * FROM songs ORDER BY listens DESC', [], (err, rows) => {
+    songsDB.find({}).sort({ listens: -1 }).exec((err, rows) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
         }
-        res.json(rows);
+        const songs = rows.map(row => ({
+            id: row._id,
+            title: row.title,
+            artist: row.artist,
+            listens: row.listens,
+            created_at: row.created_at
+        }));
+        res.json(songs);
     });
 });
 
@@ -266,47 +275,48 @@ app.post('/api/songs', (req, res) => {
         return res.status(400).json({ error: 'Songs array required' });
     }
 
-    const stmt = db.prepare('INSERT INTO songs (title, artist, listens) VALUES (?, ?, ?)');
+    const now = new Date();
+    const songDocs = songs.map(song => ({
+        title: song.title,
+        artist: song.artist,
+        listens: song.listens || 0,
+        created_at: now
+    }));
 
-    let insertedCount = 0;
-    songs.forEach(song => {
-        stmt.run([song.title, song.artist, song.listens], function(err) {
-            if (err) {
-                console.error('Error inserting song:', err.message);
-            } else {
-                insertedCount++;
-                if (insertedCount === songs.length) {
-                    res.json({ message: `${insertedCount} songs imported successfully` });
-                }
-            }
-        });
+    songsDB.insert(songDocs, (err, newDocs) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json({ message: `${newDocs.length} songs imported successfully` });
     });
-
-    stmt.finalize();
 });
 
 // Clear all songs
 app.delete('/api/songs', (req, res) => {
-    db.run('DELETE FROM songs', [], function(err) {
+    songsDB.remove({}, { multi: true }, (err, numRemoved) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
         }
-        res.json({ message: 'All songs cleared', deleted: this.changes });
+        res.json({ message: 'All songs cleared', deleted: numRemoved });
     });
 });
 
 // Get stats
 app.get('/api/stats', (req, res) => {
-    db.get('SELECT COUNT(*) as totalSongs, SUM(listens) as totalListens, AVG(listens) as avgListens FROM songs', [], (err, row) => {
+    songsDB.find({}, (err, rows) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
         }
+        const totalSongs = rows.length;
+        const totalListens = rows.reduce((sum, song) => sum + (song.listens || 0), 0);
+        const avgListens = totalSongs === 0 ? 0 : Math.round(totalListens / totalSongs);
+
         res.json({
-            totalSongs: row.totalSongs || 0,
-            totalListens: row.totalListens || 0,
-            avgListens: Math.round(row.avgListens || 0)
+            totalSongs,
+            totalListens,
+            avgListens
         });
     });
 });
@@ -331,12 +341,6 @@ app.listen(PORT, () => {
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-    db.close((err) => {
-        if (err) {
-            console.error('Error closing database:', err.message);
-        } else {
-            console.log('Database connection closed.');
-        }
-        process.exit(0);
-    });
+    console.log('Shutting down server...');
+    process.exit(0);
 });
