@@ -41,6 +41,10 @@
             <label for="songDescription">Description (optional):</label>
             <input type="text" id="songDescription" placeholder="Enter song description...">
 
+            <label>
+                <input type="checkbox" id="saveToDatabase" checked> Save to Database (uncheck to save locally only)
+            </label>
+
             <button onclick="addSong()">Add Song</button>
             <button onclick="importAllSongs()" class="import-btn">Import All</button>
             <button onclick="clearAllFields()" class="clear-btn">Clear</button>

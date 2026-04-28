@@ -27,35 +27,46 @@ function getRankClass(rank) {
 }
 
 async function getImportedData() {
-    // Always try to get from database first
+    let dbData = [];
+    let localData = [];
+
+    // Try to get from database
     try {
         const response = await fetch('/api/songs');
-        if (!response.ok) {
-            throw new Error(`Database fetch failed: ${response.status} ${response.statusText}`);
+        if (response.ok) {
+            dbData = await response.json();
+            console.log('✅ Loaded data from database:', dbData.length, 'songs');
+        } else {
+            throw new Error(`Database fetch failed: ${response.status}`);
         }
-        const data = await response.json();
-        console.log('✅ Loaded data from database:', data.length, 'songs');
-        return data;
     } catch (error) {
         console.error('❌ Database fetch failed:', error);
+    }
 
-        // Only fall back to localStorage if database is completely unavailable
-        console.log('⚠️ Falling back to localStorage...');
+    // Always get from localStorage
+    try {
         const savedData = localStorage.getItem("importedData");
-        if (!savedData) {
-            console.log('No localStorage data found either');
-            return [];
+        if (savedData) {
+            localData = JSON.parse(savedData);
+            console.log('Loaded data from localStorage:', localData.length, 'songs');
         }
+    } catch (parseError) {
+        console.error('Failed to parse localStorage data:', parseError);
+    }
 
-        try {
-            const data = JSON.parse(savedData);
-            console.log('Loaded data from localStorage:', data.length, 'songs');
-            return data;
-        } catch (parseError) {
-            console.error('Failed to parse localStorage data:', parseError);
-            return [];
+    // Merge data: database takes precedence for duplicates (by title+artist)
+    const mergedData = [...dbData];
+    const dbKeys = new Set(dbData.map(song => `${song.title}-${song.artist}`));
+
+    for (const song of localData) {
+        const key = `${song.title}-${song.artist}`;
+        if (!dbKeys.has(key)) {
+            mergedData.push(song);
         }
     }
+
+    console.log('Total merged data:', mergedData.length, 'songs');
+    return mergedData;
 }
 
 async function saveImportedData(data) {
@@ -291,6 +302,7 @@ async function importAllSongs() {
     }
 
     const songsCount = tempSongs.length;
+    const saveToDatabase = document.getElementById("saveToDatabase").checked;
 
     // Show loading message
     const importBtn = document.querySelector('.import-btn');
@@ -299,23 +311,42 @@ async function importAllSongs() {
     importBtn.disabled = true;
 
     try {
-        console.log('🚀 Starting import of', songsCount, 'songs to database...');
+        console.log('🚀 Starting import of', songsCount, 'songs...');
 
-        const result = await addImportedSongs(tempSongs);
+        if (saveToDatabase) {
+            // Save to database
+            const result = await addImportedSongs(tempSongs);
+            console.log('✅ Import successful:', result);
+            alert(`✅ Successfully imported ${songsCount} songs to database!\n\nYou can now view them on the info page.`);
+        } else {
+            // Save locally to localStorage
+            const existingData = JSON.parse(localStorage.getItem("importedData") || "[]");
+            const newData = [...existingData, ...tempSongs];
+            localStorage.setItem("importedData", JSON.stringify(newData));
+
+            // Update current data for immediate display
+            songs.length = 0;
+            songs.push(...newData);
+            currentData = [...songs];
+
+            console.log('✅ Saved locally:', songsCount, 'songs');
+            alert(`✅ Successfully saved ${songsCount} songs locally!\n\nYou can now view them on the leaderboard.`);
+        }
 
         // Success!
         tempSongs = [];
         displaySongsList();
 
-        console.log('✅ Import successful:', result);
-        alert(`✅ Successfully imported ${songsCount} songs to database!\n\nYou can now view them on the info page.`);
-
-        // Redirect to info page to show the imported songs
-        window.location.href = "info.html";
+        // Redirect based on save method
+        if (saveToDatabase) {
+            window.location.href = "info.html";
+        } else {
+            window.location.href = "leaderboard.html";
+        }
 
     } catch (error) {
         console.error('❌ Import failed:', error);
-        alert(`❌ Failed to import songs to database:\n\n${error.message}\n\nPlease make sure the server is running and try again.`);
+        alert(`❌ Failed to import songs:\n\n${error.message}\n\nPlease make sure the server is running and try again.`);
 
     } finally {
         // Reset button
@@ -390,13 +421,18 @@ async function displayDataInfo() {
 }
 
 async function clearData() {
-    if (confirm("⚠️ Are you sure you want to clear ALL imported songs from the database?\n\nThis action cannot be undone!")) {
+    if (confirm("⚠️ Are you sure you want to clear ALL imported songs from the database?\n\nThis will also clear local storage data.\n\nThis action cannot be undone!")) {
         try {
             console.log('🗑️ Clearing all data from database...');
             const result = await clearImportedData();
             await displayDataInfo();
             console.log('✅ Database cleared:', result);
-            alert("✅ All songs have been cleared from the database!");
+
+            // Also clear localStorage
+            localStorage.removeItem("importedData");
+            console.log('✅ LocalStorage cleared');
+
+            alert("✅ All songs have been cleared from database and local storage!");
         } catch (error) {
             console.error('❌ Failed to clear database:', error);
             alert(`❌ Failed to clear data from database:\n\n${error.message}\n\nPlease make sure the server is running.`);
