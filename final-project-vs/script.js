@@ -162,7 +162,7 @@ function renderTable() {
     tbody.innerHTML = currentData.map((song, index) => `
         <tr>
             <td class="${getRankClass(index + 1)}">${index + 1}</td>
-            <td class="song-title">${song.title}</td>
+            <td class="song-title">${song.title}${song.description ? `<br><small style="color: #666;">${song.description}</small>` : ''}</td>
             <td class="artist">${song.artist}</td>
             <td class="listens">${formatListens(song.listens)}</td>
         </tr>
@@ -220,6 +220,7 @@ function addSong() {
     const title = document.getElementById("songTitle").value.trim();
     const artist = document.getElementById("artistName").value.trim();
     const listens = document.getElementById("listensCount").value.trim();
+    const description = document.getElementById("songDescription").value.trim();
 
     if (!title) {
         alert("Please enter a song title");
@@ -237,7 +238,8 @@ function addSong() {
     const song = {
         title: title,
         artist: artist,
-        listens: parseInt(listens)
+        listens: parseInt(listens),
+        description: description || ""  // Optional, default to empty string
     };
 
     tempSongs.push(song);
@@ -246,6 +248,7 @@ function addSong() {
     document.getElementById("songTitle").value = "";
     document.getElementById("artistName").value = "";
     document.getElementById("listensCount").value = "";
+    document.getElementById("songDescription").value = "";
     document.getElementById("songTitle").focus();
 }
 
@@ -266,6 +269,7 @@ function displaySongsList() {
                 <div><strong>${index + 1}. ${song.title}</strong></div>
                 <div>Artist: ${song.artist}</div>
                 <div>Listens: ${song.listens.toLocaleString()}</div>
+                ${song.description ? `<div>Description: ${song.description}</div>` : ''}
                 <button onclick="removeSong(${index})" class="remove-btn">Remove</button>
             </div>
         `;
@@ -304,10 +308,10 @@ async function importAllSongs() {
         displaySongsList();
 
         console.log('✅ Import successful:', result);
-        alert(`✅ Successfully imported ${songsCount} songs to database!\n\nYou can now view them on the leaderboard.`);
+        alert(`✅ Successfully imported ${songsCount} songs to database!\n\nYou can now view them on the info page.`);
 
-        // Redirect to leaderboard to show the imported songs
-        window.location.href = "leaderboard.html";
+        // Redirect to info page to show the imported songs
+        window.location.href = "info.html";
 
     } catch (error) {
         console.error('❌ Import failed:', error);
@@ -325,6 +329,7 @@ function clearAllFields() {
         document.getElementById("songTitle").value = "";
         document.getElementById("artistName").value = "";
         document.getElementById("listensCount").value = "";
+        document.getElementById("songDescription").value = "";
         tempSongs = [];
         displaySongsList();
     }
@@ -349,20 +354,35 @@ async function displayDataInfo() {
                 <p><strong>Average Listens:</strong> ${stats.avgListens.toLocaleString()}</p>
             </div>
             <h3>Imported Songs:</h3>
-            <div class="data-list">
+            <table class="info-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Song Title</th>
+                        <th>Artist</th>
+                        <th>Description</th>
+                        <th>Listens</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
 
         data.forEach((song, index) => {
             html += `
-                <div class="data-item">
-                    <div><strong>${index + 1}. ${song.title}</strong></div>
-                    <div>Artist: ${song.artist}</div>
-                    <div>Listens: ${Number(song.listens).toLocaleString()}</div>
-                </div>
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${song.title}</td>
+                    <td>${song.artist}</td>
+                    <td>${song.description || 'N/A'}</td>
+                    <td>${Number(song.listens).toLocaleString()}</td>
+                </tr>
             `;
         });
 
-        html += `</div>`;
+        html += `
+                </tbody>
+            </table>
+        `;
         dataInfoDiv.innerHTML = html;
     } catch (error) {
         dataInfoDiv.innerHTML = "<p style='color: red;'>Error loading data. Please try again.</p>";

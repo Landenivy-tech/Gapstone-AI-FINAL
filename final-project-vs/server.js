@@ -262,6 +262,7 @@ app.get('/api/songs', (req, res) => {
             title: row.title,
             artist: row.artist,
             listens: row.listens,
+            description: row.description || "",
             created_at: row.created_at
         }));
         res.json(songs);
@@ -280,6 +281,7 @@ app.post('/api/songs', (req, res) => {
         title: song.title,
         artist: song.artist,
         listens: song.listens || 0,
+        description: song.description || "",
         created_at: now
     }));
 

@@ -315,6 +315,39 @@ tbody tr:hover {
     margin-bottom: 30px;
 }
 
+.info-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 30px;
+    background-color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.info-table th {
+    background-color: #667eea;
+    color: white;
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    border: none;
+}
+
+.info-table th:hover {
+    background-color: #5a67d8;
+}
+
+.info-table td {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    color: #333;
+}
+
+.info-table tbody tr:hover {
+    background-color: #f9f9f9;
+}
+
 .data-item {
     background-color: #f9f9f9;
     padding: 15px;
