@@ -13,6 +13,8 @@ const songs = [
 
 let currentData = [...songs];
 
+const MAX_LISTENS = 10000000; // 10 million max listens
+
 function formatListens(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
     if (num >= 1000) return (num / 1000).toFixed(1) + "K";
@@ -221,9 +223,20 @@ async function loadImportedData() {
     }
 }
 
-if (document.getElementById("leaderboardBody")) {
-    renderTable();
-}
+document.addEventListener('DOMContentLoaded', async () => {
+    const leaderboardBody = document.getElementById("leaderboardBody");
+    const dataInfo = document.getElementById("dataInfo");
+
+    if (leaderboardBody) {
+        await loadImportedData();
+        currentData = [...songs];
+        renderTable();
+    }
+
+    if (dataInfo) {
+        displayDataInfo();
+    }
+});
 
 let tempSongs = [];
 
@@ -246,11 +259,17 @@ function addSong() {
         return;
     }
 
+    const listensNum = parseInt(listens);
+    if (listensNum > MAX_LISTENS) {
+        alert(`Maximum listens allowed is ${MAX_LISTENS.toLocaleString()}. Please enter a lower number.`);
+        return;
+    }
+
     const song = {
         title: title,
         artist: artist,
-        listens: parseInt(listens),
-        description: description || ""  // Optional, default to empty string
+        listens: listensNum,
+        description: description || ""
     };
 
     tempSongs.push(song);
@@ -295,6 +314,17 @@ function removeSong(index) {
     displaySongsList();
 }
 
+function saveSongsLocally(songsToSave) {
+    const existingData = JSON.parse(localStorage.getItem("importedData") || "[]");
+    const newData = [...existingData, ...songsToSave];
+    localStorage.setItem("importedData", JSON.stringify(newData));
+
+    songs.length = 0;
+    songs.push(...newData);
+    currentData = [...songs];
+    console.log('✅ Saved locally:', songsToSave.length, 'songs');
+}
+
 async function importAllSongs() {
     if (tempSongs.length === 0) {
         alert("Please add at least one song before importing");
@@ -314,40 +344,37 @@ async function importAllSongs() {
         console.log('🚀 Starting import of', songsCount, 'songs...');
 
         if (saveToDatabase) {
-            // Save to database
-            const result = await addImportedSongs(tempSongs);
-            console.log('✅ Import successful:', result);
-            alert(`✅ Successfully imported ${songsCount} songs to database!\n\nYou can now view them on the info page.`);
-        } else {
-            // Save locally to localStorage
-            const existingData = JSON.parse(localStorage.getItem("importedData") || "[]");
-            const newData = [...existingData, ...tempSongs];
-            localStorage.setItem("importedData", JSON.stringify(newData));
-
-            // Update current data for immediate display
-            songs.length = 0;
-            songs.push(...newData);
-            currentData = [...songs];
-
-            console.log('✅ Saved locally:', songsCount, 'songs');
-            alert(`✅ Successfully saved ${songsCount} songs locally!\n\nYou can now view them on the leaderboard.`);
+            try {
+                const result = await addImportedSongs(tempSongs);
+                console.log('✅ Import successful:', result);
+                alert(`✅ Successfully imported ${songsCount} songs to database!\n\nYou can now view them on the info page.`);
+                tempSongs = [];
+                displaySongsList();
+                window.location.href = "info.html";
+                return;
+            } catch (dbError) {
+                const saveLocal = confirm('Database save failed. Save songs locally instead?');
+                if (saveLocal) {
+                    saveSongsLocally(tempSongs);
+                    alert(`✅ Saved ${songsCount} songs locally. You can view them on the leaderboard.`);
+                    tempSongs = [];
+                    displaySongsList();
+                    window.location.href = "leaderboard.html";
+                    return;
+                }
+                throw dbError;
+            }
         }
 
-        // Success!
+        saveSongsLocally(tempSongs);
+        alert(`✅ Successfully saved ${songsCount} songs locally!\n\nYou can now view them on the leaderboard.`);
         tempSongs = [];
         displaySongsList();
-
-        // Redirect based on save method
-        if (saveToDatabase) {
-            window.location.href = "info.html";
-        } else {
-            window.location.href = "leaderboard.html";
-        }
+        window.location.href = "leaderboard.html";
 
     } catch (error) {
         console.error('❌ Import failed:', error);
         alert(`❌ Failed to import songs:\n\n${error.message}\n\nPlease make sure the server is running and try again.`);
-
     } finally {
         // Reset button
         importBtn.textContent = originalText;

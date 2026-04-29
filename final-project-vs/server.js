@@ -276,6 +276,18 @@ app.post('/api/songs', (req, res) => {
         return res.status(400).json({ error: 'Songs array required' });
     }
 
+    const MAX_LISTENS = 10000000;
+
+    // Validate each song
+    for (const song of songs) {
+        if (!song.title || !song.artist || typeof song.listens !== 'number') {
+            return res.status(400).json({ error: 'Invalid song data: title, artist, and listens required' });
+        }
+        if (song.listens > MAX_LISTENS) {
+            return res.status(400).json({ error: `Listens cannot exceed ${MAX_LISTENS.toLocaleString()}` });
+        }
+    }
+
     const now = new Date();
     const songDocs = songs.map(song => ({
         title: song.title,

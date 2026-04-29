@@ -1,14 +1,15 @@
 # Music Leaderboard with Database
 
-A full-stack music leaderboard application that stores imported song data in an SQLite database.
+A full-stack music leaderboard application that stores imported song data in a NeDB database and supports local storage fallback.
 
 ## Features
 
-- View default rock songs leaderboard
-- Import custom songs with artist and listen counts
-- Persistent storage in SQLite database
-- View imported data statistics
-- Search and sort functionality
+- View a default rock music leaderboard
+- Import custom songs with artist, listen counts, and optional descriptions
+- Save imports to server-side database or local browser storage
+- Automatic leaderboard refresh after import
+- View statistics and clear stored data from the info page
+- Search and sort songs from the leaderboard
 
 ## Setup
 
@@ -24,6 +25,11 @@ A full-stack music leaderboard application that stores imported song data in an 
 
 3. Open your browser to `http://localhost:3000`
 
+4. Optional development mode:
+   ```bash
+   npm run dev
+   ```
+
 ## API Endpoints
 
 - `GET /api/songs` - Get all imported songs
@@ -33,15 +39,10 @@ A full-stack music leaderboard application that stores imported song data in an 
 
 ## Database
 
-The app uses SQLite (`songs.db`) with a `songs` table containing:
-- id (auto-increment)
-- title
-- artist
-- listens
-- created_at
+The app uses NeDB database files (`songs.db`, `users.db`, `user_data.db`) to store playlist and user data.
 
 ## Pages
 
 - `/` - Leaderboard (shows imported songs if any, else defaults)
-- `/import` - Import new songs
-- `/info` - View imported data and statistics
+- `/import` - Import new songs and choose whether to save locally or to the database
+- `/info` - View imported data, stats, and clear stored data

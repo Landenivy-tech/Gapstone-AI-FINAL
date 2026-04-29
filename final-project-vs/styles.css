@@ -57,6 +57,11 @@ nav a:hover::before {
     left: 100%;
 }
 
+nav a.active {
+    background: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+}
+
 nav a:hover {
     background: rgba(255, 255, 255, 0.2);
     transform: translateY(-2px);
@@ -125,6 +130,13 @@ h1 {
     margin-bottom: 20px;
     position: relative;
     z-index: 1;
+}
+
+.page-note {
+    font-size: 1em;
+    opacity: 0.8;
+    margin-top: 10px;
+    color: #f0f0f0;
 }
 
 .controls {
@@ -518,8 +530,17 @@ tbody tr:hover {
     background-color: #dc3545;
 }
 
-.info-section button:hover {
+.info-section button:not(.refresh-btn):hover {
     background-color: #c82333;
+}
+
+.info-section .refresh-btn {
+    background-color: #4caf50;
+    margin-right: 15px;
+}
+
+.info-section .refresh-btn:hover {
+    background-color: #43a047;
 }
 
 /* Database notice styling */

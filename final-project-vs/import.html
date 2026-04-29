@@ -11,15 +11,15 @@
         <nav>
             <ul>
                 <li><a href="leaderboard.html">Leaderboard</a></li>
-                <li><a href="import.html">Import</a></li>
+                <li><a class="active" href="import.html">Import</a></li>
                 <li><a href="info.html">Info</a></li>
             </ul>
         </nav>
         <header>
-            <h1>📥 Import Data to Database</h1>
-            <p class="subtitle">Add your music data - songs will be saved to the database</p>
+            <h1>📥 Import Data</h1>
+            <p class="subtitle">Add your music data and choose whether to save to the database or locally.</p>
             <div class="database-notice">
-                <strong>💾 Database Storage:</strong> All imported songs are saved to the server database and will persist across sessions.
+                <strong>💾 Database Storage:</strong> If the database is unavailable, you can still save songs locally and review them in the leaderboard.
             </div>
         </header>
 
@@ -35,8 +35,8 @@
             <label for="artistName">Artist:</label>
             <input type="text" id="artistName" placeholder="Enter artist name...">
 
-            <label for="listensCount">Listens:</label>
-            <input type="number" id="listensCount" placeholder="Enter number of listens...">
+            <label for="listensCount">Listens: (Max: 10,000,000)</label>
+            <input type="number" id="listensCount" placeholder="Enter number of listens..." max="10000000" min="1">
 
             <label for="songDescription">Description (optional):</label>
             <input type="text" id="songDescription" placeholder="Enter song description...">
@@ -45,9 +45,9 @@
                 <input type="checkbox" id="saveToDatabase" checked> Save to Database (uncheck to save locally only)
             </label>
 
-            <button onclick="addSong()">Add Song</button>
-            <button onclick="importAllSongs()" class="import-btn">Import All</button>
-            <button onclick="clearAllFields()" class="clear-btn">Clear</button>
+            <button type="button" onclick="addSong()">Add Song</button>
+            <button type="button" onclick="importAllSongs()" class="import-btn">Import All</button>
+            <button type="button" onclick="clearAllFields()" class="clear-btn">Clear</button>
 
             <div id="songsList"></div>
         </div>

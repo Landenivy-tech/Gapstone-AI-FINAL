@@ -12,7 +12,7 @@
             <ul>
                 <li><a href="leaderboard.html">Leaderboard</a></li>
                 <li><a href="import.html">Import</a></li>
-                <li><a href="info.html">Info</a></li>
+                <li><a class="active" href="info.html">Info</a></li>
             </ul>
         </nav>
         <header>
@@ -25,7 +25,8 @@
 
         <div class="info-section">
             <div id="dataInfo"></div>
-            <button onclick="clearData()">Clear All Data</button>
+            <button type="button" onclick="displayDataInfo()" class="refresh-btn">Refresh Data</button>
+            <button type="button" onclick="clearData()">Clear All Data</button>
         </div>
     </div>
 
