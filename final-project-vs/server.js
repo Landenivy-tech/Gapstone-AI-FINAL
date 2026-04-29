@@ -305,6 +305,52 @@ app.post('/api/songs', (req, res) => {
     });
 });
 
+// Update song by ID
+app.put('/api/songs/:songId', (req, res) => {
+    const songId = req.params.songId;
+    const { title, artist, listens, description } = req.body;
+
+    if (!title || !artist || typeof listens !== 'number') {
+        return res.status(400).json({ error: 'Invalid song data: title, artist, and listens required' });
+    }
+    if (listens > 10000000 || listens < 0) {
+        return res.status(400).json({ error: 'Listens must be between 0 and 10,000,000' });
+    }
+
+    const updateDoc = {
+        title,
+        artist,
+        listens,
+        description: description || ""
+    };
+
+    songsDB.update({ _id: songId }, { $set: updateDoc }, {}, (err, numReplaced) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        if (numReplaced === 0) {
+            return res.status(404).json({ error: 'Song not found' });
+        }
+
+        songsDB.findOne({ _id: songId }, (err, updatedSong) => {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            if (!updatedSong) {
+                return res.status(404).json({ error: 'Song not found after update' });
+            }
+            res.json({
+                id: updatedSong._id,
+                title: updatedSong.title,
+                artist: updatedSong.artist,
+                listens: updatedSong.listens,
+                description: updatedSong.description || "",
+                created_at: updatedSong.created_at
+            });
+        });
+    });
+});
+
 // Clear all songs
 app.delete('/api/songs', (req, res) => {
     songsDB.remove({}, { multi: true }, (err, numRemoved) => {

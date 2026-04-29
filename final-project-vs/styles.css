@@ -539,6 +539,47 @@ tbody tr:hover {
     margin-right: 15px;
 }
 
+.edit-btn,
+.save-btn,
+.cancel-btn {
+    padding: 8px 14px;
+    margin: 0 4px 4px 0;
+    font-size: 0.95em;
+}
+
+.edit-btn {
+    background: #1c7ed6;
+}
+
+.edit-btn:hover {
+    background: #1971c2;
+}
+
+.save-btn {
+    background: #28a745;
+}
+
+.save-btn:hover {
+    background: #218838;
+}
+
+.cancel-btn {
+    background: #6c757d;
+}
+
+.cancel-btn:hover {
+    background: #5a6268;
+}
+
+.editing-row input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e8e8e8;
+}
+
 .info-section .refresh-btn:hover {
     background-color: #43a047;
 }

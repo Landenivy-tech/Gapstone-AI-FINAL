@@ -7,6 +7,7 @@ A full-stack music leaderboard application that stores imported song data in a N
 - View a default rock music leaderboard
 - Import custom songs with artist, listen counts, and optional descriptions
 - Save imports to server-side database or local browser storage
+- Edit imported songs directly from the info page
 - Automatic leaderboard refresh after import
 - View statistics and clear stored data from the info page
 - Search and sort songs from the leaderboard

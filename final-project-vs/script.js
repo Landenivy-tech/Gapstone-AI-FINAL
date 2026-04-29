@@ -12,6 +12,8 @@ const songs = [
 ];
 
 let currentData = [...songs];
+let loadedData = [];
+let editingInfoIndex = null;
 
 const MAX_LISTENS = 10000000; // 10 million max listens
 
@@ -49,7 +51,21 @@ async function getImportedData() {
     try {
         const savedData = localStorage.getItem("importedData");
         if (savedData) {
-            localData = JSON.parse(savedData);
+            const parsedData = JSON.parse(savedData);
+            let saveBack = false;
+            localData = parsedData.map((song, index) => {
+                if (!song.id) {
+                    saveBack = true;
+                    return {
+                        ...song,
+                        id: `local-${Date.now()}-${index}`
+                    };
+                }
+                return song;
+            });
+            if (saveBack) {
+                localStorage.setItem("importedData", JSON.stringify(localData));
+            }
             console.log('Loaded data from localStorage:', localData.length, 'songs');
         }
     } catch (parseError) {
@@ -314,9 +330,20 @@ function removeSong(index) {
     displaySongsList();
 }
 
+function ensureLocalSongId(song, fallbackIndex) {
+    return {
+        ...song,
+        id: song.id || `local-${Date.now()}-${fallbackIndex}`
+    };
+}
+
 function saveSongsLocally(songsToSave) {
     const existingData = JSON.parse(localStorage.getItem("importedData") || "[]");
-    const newData = [...existingData, ...songsToSave];
+    const normalizedExisting = existingData.map((song, index) => ensureLocalSongId(song, index));
+    const newData = [
+        ...normalizedExisting,
+        ...songsToSave.map((song, index) => ensureLocalSongId(song, index + normalizedExisting.length))
+    ];
     localStorage.setItem("importedData", JSON.stringify(newData));
 
     songs.length = 0;
@@ -399,8 +426,10 @@ async function displayDataInfo() {
 
     try {
         const [data, stats] = await Promise.all([getImportedData(), getStats()]);
+        loadedData = data;
 
         if (data.length === 0) {
+            editingInfoIndex = null;
             dataInfoDiv.innerHTML = "<p style='text-align: center; color: #999;'>No imported data yet. <a href='import.html'>Go to Import</a></p>";
             return;
         }
@@ -420,21 +449,39 @@ async function displayDataInfo() {
                         <th>Artist</th>
                         <th>Description</th>
                         <th>Listens</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
         `;
 
         data.forEach((song, index) => {
-            html += `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td>${song.title}</td>
-                    <td>${song.artist}</td>
-                    <td>${song.description || 'N/A'}</td>
-                    <td>${Number(song.listens).toLocaleString()}</td>
-                </tr>
-            `;
+            if (editingInfoIndex === index) {
+                html += `
+                    <tr class="editing-row">
+                        <td>${index + 1}</td>
+                        <td><input id="edit-title-${index}" type="text" value="${song.title.replace(/"/g, '&quot;')}" /></td>
+                        <td><input id="edit-artist-${index}" type="text" value="${song.artist.replace(/"/g, '&quot;')}" /></td>
+                        <td><input id="edit-description-${index}" type="text" value="${(song.description || '').replace(/"/g, '&quot;')}" /></td>
+                        <td><input id="edit-listens-${index}" type="number" min="0" max="10000000" value="${Number(song.listens)}" /></td>
+                        <td>
+                            <button type="button" onclick="saveEditedSong(${index})" class="save-btn">Save</button>
+                            <button type="button" onclick="cancelEditSong()" class="cancel-btn">Cancel</button>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                html += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${song.title}</td>
+                        <td>${song.artist}</td>
+                        <td>${song.description || 'N/A'}</td>
+                        <td>${Number(song.listens).toLocaleString()}</td>
+                        <td><button type="button" onclick="startEditSong(${index})" class="edit-btn">Edit</button></td>
+                    </tr>
+                `;
+            }
         });
 
         html += `
@@ -444,6 +491,91 @@ async function displayDataInfo() {
         dataInfoDiv.innerHTML = html;
     } catch (error) {
         dataInfoDiv.innerHTML = "<p style='color: red;'>Error loading data. Please try again.</p>";
+    }
+}
+
+function startEditSong(index) {
+    editingInfoIndex = index;
+    displayDataInfo();
+}
+
+function cancelEditSong() {
+    editingInfoIndex = null;
+    displayDataInfo();
+}
+
+async function updateSong(songId, updatedFields) {
+    const response = await fetch(`/api/songs/${encodeURIComponent(songId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedFields)
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Update failed with status ${response.status}`);
+    }
+
+    return await response.json();
+}
+
+async function saveEditedSong(index) {
+    const song = loadedData[index];
+    if (!song) {
+        alert('Unable to save: song not found');
+        return;
+    }
+
+    const title = document.getElementById(`edit-title-${index}`).value.trim();
+    const artist = document.getElementById(`edit-artist-${index}`).value.trim();
+    const listensValue = document.getElementById(`edit-listens-${index}`).value.trim();
+    const description = document.getElementById(`edit-description-${index}`).value.trim();
+
+    if (!title) {
+        alert('Please enter a song title');
+        return;
+    }
+    if (!artist) {
+        alert('Please enter an artist name');
+        return;
+    }
+    const listens = parseInt(listensValue, 10);
+    if (isNaN(listens) || listens < 0 || listens > MAX_LISTENS) {
+        alert('Please enter a valid listens count between 0 and ' + MAX_LISTENS.toLocaleString());
+        return;
+    }
+
+    const updatedSong = {
+        title,
+        artist,
+        listens,
+        description: description || ''
+    };
+
+    try {
+        if (song.id && song.id.toString().startsWith('local-')) {
+            const localData = JSON.parse(localStorage.getItem('importedData') || '[]');
+            const updatedLocal = localData.map(item => {
+                if (item.id === song.id) {
+                    return {
+                        ...item,
+                        ...updatedSong,
+                        id: song.id
+                    };
+                }
+                return item;
+            });
+            localStorage.setItem('importedData', JSON.stringify(updatedLocal));
+            alert('✅ Local song updated successfully.');
+        } else {
+            await updateSong(song.id, updatedSong);
+            alert('✅ Song updated successfully in the database.');
+        }
+        editingInfoIndex = null;
+        await displayDataInfo();
+    } catch (error) {
+        console.error('❌ Failed to save edit:', error);
+        alert(`❌ Could not save changes: ${error.message}`);
     }
 }
 
