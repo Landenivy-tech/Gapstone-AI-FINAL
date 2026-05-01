@@ -67,7 +67,9 @@ CREATE TABLE songs (
     title VARCHAR(255) NOT NULL,
     artist VARCHAR(255) NOT NULL,
     listens INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    description TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_song_title_artist (title, artist)
 ) ENGINE=InnoDB;
 
 -- Create indexes for faster song lookups

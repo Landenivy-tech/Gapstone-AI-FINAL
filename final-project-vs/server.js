@@ -1,406 +1,212 @@
 const express = require('express');
-const Datastore = require('nedb');
+const mysql = require('mysql2/promise');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
-const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+const dbConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'final_ai',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+};
+
+const pool = mysql.createPool(dbConfig);
+
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname)));
 
-// Database setup with NeDB
-const usersDB = new Datastore({ filename: './users.db', autoload: true });
-const userDataDB = new Datastore({ filename: './user_data.db', autoload: true });
-const songsDB = new Datastore({ filename: './songs.db', autoload: true });
+async function ensureSongsSchema() {
+    const connection = await pool.getConnection();
+    try {
+        await connection.execute(`
+            CREATE TABLE IF NOT EXISTS songs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                artist VARCHAR(255) NOT NULL,
+                listens INT NOT NULL DEFAULT 0,
+                description TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_song_title_artist (title, artist)
+            ) ENGINE=InnoDB;
+        `);
+        const [rows] = await connection.execute(
+            `SELECT COUNT(*) AS count
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = ?
+               AND TABLE_NAME = 'songs'
+               AND COLUMN_NAME = 'description'`,
+            [dbConfig.database]
+        );
 
-console.log('Connected to NeDB databases.');
-
-// Helper function to hash passwords
-function hashPassword(password) {
-    return crypto.createHash('sha256').update(password).digest('hex');
+        if (rows[0].count === 0) {
+            await connection.execute('ALTER TABLE songs ADD COLUMN description TEXT NULL');
+        }
+    } finally {
+        connection.release();
+    }
 }
 
-// API Routes
+async function queryDatabase(sql, params = []) {
+    const [rows] = await pool.execute(sql, params);
+    return rows;
+}
 
-// ========== USER AUTHENTICATION ROUTES ==========
-
-// Register a new user
-app.post('/api/auth/register', (req, res) => {
-    const { username, email, password } = req.body;
-
-    if (!username || !email || !password) {
-        return res.status(400).json({ error: 'Username, email, and password required' });
-    }
-
-    const hashedPassword = hashPassword(password);
-
-    // Check if user already exists
-    usersDB.findOne({ $or: [{ username: username }, { email: email }] }, (err, existingUser) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-
-        if (existingUser) {
-            return res.status(400).json({ error: 'Username or email already exists' });
-        }
-
-        // Create new user
-        const newUser = {
-            username: username,
-            email: email,
-            password: hashedPassword,
-            created_at: new Date(),
-            last_login: null
-        };
-
-        usersDB.insert(newUser, (err, insertedUser) => {
-            if (err) {
-                return res.status(500).json({ error: err.message });
-            }
-
-            res.json({
-                message: 'User registered successfully',
-                userId: insertedUser._id,
-                username: insertedUser.username,
-                email: insertedUser.email
-            });
-        });
-    });
-});
-
-// Login user
-app.post('/api/auth/login', (req, res) => {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-        return res.status(400).json({ error: 'Username and password required' });
-    }
-
-    const hashedPassword = hashPassword(password);
-
-    usersDB.findOne({ username: username, password: hashedPassword }, (err, user) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-
-        if (!user) {
-            return res.status(401).json({ error: 'Invalid username or password' });
-        }
-
-        // Update last login
-        usersDB.update({ _id: user._id }, { $set: { last_login: new Date() } }, {}, (err) => {
-            if (err) {
-                console.error('Error updating last login:', err);
-            }
-        });
-
-        res.json({
-            message: 'Login successful',
-            userId: user._id,
-            username: user.username,
-            email: user.email
-        });
-    });
-});
-
-// Get all users
-app.get('/api/users', (req, res) => {
-    usersDB.find({}, (err, users) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        // Transform NeDB format to match expected format
-        const transformedUsers = users.map(user => ({
-            id: user._id,
-            username: user.username,
-            email: user.email,
-            created_at: user.created_at,
-            last_login: user.last_login
-        }));
-        res.json(transformedUsers);
-    });
-});
-
-// Get specific user profile
-app.get('/api/users/:userId', (req, res) => {
-    const userId = req.params.userId;
-
-    usersDB.findOne({ _id: userId }, (err, user) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-        // Transform NeDB format to match expected format
-        res.json({
-            id: user._id,
-            username: user.username,
-            email: user.email,
-            created_at: user.created_at,
-            last_login: user.last_login
-        });
-    });
-});
-
-// ========== USER DATA ROUTES ==========
-
-// Save user data
-app.post('/api/users/:userId/data', (req, res) => {
-    const userId = req.params.userId;
-    const { key, value } = req.body;
-
-    if (!key || value === undefined) {
-        return res.status(400).json({ error: 'Key and value required' });
-    }
-
-    // Check if data already exists
-    userDataDB.findOne({ user_id: userId, data_key: key }, (err, existingData) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-
-        const now = new Date();
-
-        if (existingData) {
-            // Update existing data
-            userDataDB.update(
-                { _id: existingData._id },
-                { $set: { data_value: value, updated_at: now } },
-                {},
-                (err) => {
-                    if (err) {
-                        return res.status(500).json({ error: err.message });
-                    }
-                    res.json({ message: 'Data saved successfully', key: key, value: value });
-                }
-            );
-        } else {
-            // Insert new data
-            const newData = {
-                user_id: userId,
-                data_key: key,
-                data_value: value,
-                created_at: now,
-                updated_at: now
-            };
-
-            userDataDB.insert(newData, (err) => {
-                if (err) {
-                    return res.status(500).json({ error: err.message });
-                }
-                res.json({ message: 'Data saved successfully', key: key, value: value });
-            });
-        }
-    });
-});
-
-// Get user data by key
-app.get('/api/users/:userId/data/:key', (req, res) => {
-    const { userId, key } = req.params;
-
-    userDataDB.findOne({ user_id: userId, data_key: key }, (err, row) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        if (!row) {
-            return res.status(404).json({ error: 'Data not found' });
-        }
-        res.json({
-            key: row.data_key,
-            value: row.data_value,
-            created_at: row.created_at,
-            updated_at: row.updated_at
-        });
-    });
-});
-
-// Get all user data
-app.get('/api/users/:userId/data', (req, res) => {
-    const userId = req.params.userId;
-
-    userDataDB.find({ user_id: userId }).sort({ updated_at: -1 }).exec((err, rows) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        const data = rows.map(row => ({
-            key: row.data_key,
-            value: row.data_value,
-            created_at: row.created_at,
-            updated_at: row.updated_at
-        }));
-        res.json(data);
-    });
-});
-
-// Delete user data
-app.delete('/api/users/:userId/data/:key', (req, res) => {
-    const { userId, key } = req.params;
-
-    userDataDB.remove({ user_id: userId, data_key: key }, {}, (err, numRemoved) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        res.json({ message: 'Data deleted successfully', deletedRows: numRemoved });
-    });
-});
-
-// ========== SONGS ROUTES ==========
-app.get('/api/songs', (req, res) => {
-    songsDB.find({}).sort({ listens: -1 }).exec((err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        const songs = rows.map(row => ({
-            id: row._id,
-            title: row.title,
-            artist: row.artist,
-            listens: row.listens,
-            description: row.description || "",
-            created_at: row.created_at
-        }));
+app.get('/api/songs', async (req, res) => {
+    try {
+        const songs = await queryDatabase(
+            'SELECT id, title, artist, listens, description FROM songs ORDER BY listens DESC'
+        );
         res.json(songs);
-    });
+    } catch (error) {
+        console.error('Failed to fetch songs:', error);
+        res.status(500).json({ error: 'Failed to fetch songs' });
+    }
 });
 
-// Add multiple songs
-app.post('/api/songs', (req, res) => {
-    const songs = req.body.songs;
-    if (!songs || !Array.isArray(songs)) {
-        return res.status(400).json({ error: 'Songs array required' });
+app.post('/api/songs', async (req, res) => {
+    const songs = Array.isArray(req.body.songs) ? req.body.songs : [];
+
+    if (!songs.length) {
+        return res.status(400).json({ error: 'No songs provided' });
     }
 
-    const MAX_LISTENS = 10000000;
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
 
-    // Validate each song
-    for (const song of songs) {
-        if (!song.title || !song.artist || typeof song.listens !== 'number') {
-            return res.status(400).json({ error: 'Invalid song data: title, artist, and listens required' });
+        for (const song of songs) {
+            const title = (song.title || '').trim();
+            const artist = (song.artist || '').trim();
+            const listens = Number(song.listens) || 0;
+            const description = song.description || null;
+
+            if (!title || !artist) {
+                continue;
+            }
+
+            await connection.execute(
+                `INSERT INTO songs (title, artist, listens, description)
+                 VALUES (?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                     listens = VALUES(listens),
+                     description = VALUES(description)`,
+                [title, artist, listens, description]
+            );
         }
-        if (song.listens > MAX_LISTENS) {
-            return res.status(400).json({ error: `Listens cannot exceed ${MAX_LISTENS.toLocaleString()}` });
-        }
+
+        await connection.commit();
+        res.json({ success: true, message: 'Songs saved successfully' });
+    } catch (error) {
+        await connection.rollback();
+        console.error('Failed to save songs:', error);
+        res.status(500).json({ error: 'Failed to save songs' });
+    } finally {
+        connection.release();
     }
-
-    const now = new Date();
-    const songDocs = songs.map(song => ({
-        title: song.title,
-        artist: song.artist,
-        listens: song.listens || 0,
-        description: song.description || "",
-        created_at: now
-    }));
-
-    songsDB.insert(songDocs, (err, newDocs) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        res.json({ message: `${newDocs.length} songs imported successfully` });
-    });
 });
 
-// Update song by ID
-app.put('/api/songs/:songId', (req, res) => {
-    const songId = req.params.songId;
-    const { title, artist, listens, description } = req.body;
-
-    if (!title || !artist || typeof listens !== 'number') {
-        return res.status(400).json({ error: 'Invalid song data: title, artist, and listens required' });
+app.delete('/api/songs', async (req, res) => {
+    try {
+        const result = await queryDatabase('DELETE FROM songs');
+        res.json({ success: true, message: 'All songs deleted', rowsAffected: result.affectedRows || 0 });
+    } catch (error) {
+        console.error('Failed to clear songs:', error);
+        res.status(500).json({ error: 'Failed to clear songs' });
     }
-    if (listens > 10000000 || listens < 0) {
-        return res.status(400).json({ error: 'Listens must be between 0 and 10,000,000' });
+});
+
+app.get('/api/stats', async (req, res) => {
+    try {
+        const [stats] = await queryDatabase(
+            `SELECT
+                COUNT(*) AS totalSongs,
+                COALESCE(SUM(listens), 0) AS totalListens,
+                COALESCE(ROUND(AVG(listens)), 0) AS avgListens
+             FROM songs`
+        );
+        res.json(stats || { totalSongs: 0, totalListens: 0, avgListens: 0 });
+    } catch (error) {
+        console.error('Failed to fetch stats:', error);
+        res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+});
+
+app.put('/api/songs/:songId', async (req, res) => {
+    const songId = parseInt(req.params.songId, 10);
+    if (Number.isNaN(songId)) {
+        return res.status(400).json({ error: 'Invalid song ID' });
     }
 
-    const updateDoc = {
-        title,
-        artist,
-        listens,
-        description: description || ""
-    };
+    const title = req.body.title ? req.body.title.trim() : null;
+    const artist = req.body.artist ? req.body.artist.trim() : null;
+    const listens = req.body.listens !== undefined ? Number(req.body.listens) : null;
+    const description = req.body.description !== undefined ? req.body.description : null;
 
-    songsDB.update({ _id: songId }, { $set: updateDoc }, {}, (err, numReplaced) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        if (numReplaced === 0) {
+    const updates = [];
+    const values = [];
+
+    if (title !== null && title !== '') {
+        updates.push('title = ?');
+        values.push(title);
+    }
+    if (artist !== null && artist !== '') {
+        updates.push('artist = ?');
+        values.push(artist);
+    }
+    if (listens !== null && !Number.isNaN(listens)) {
+        updates.push('listens = ?');
+        values.push(listens);
+    }
+    if (description !== null) {
+        updates.push('description = ?');
+        values.push(description);
+    }
+
+    if (updates.length === 0) {
+        return res.status(400).json({ error: 'No valid fields provided for update' });
+    }
+
+    values.push(songId);
+
+    try {
+        const result = await queryDatabase(
+            `UPDATE songs SET ${updates.join(', ')} WHERE id = ?`,
+            values
+        );
+
+        if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Song not found' });
         }
 
-        songsDB.findOne({ _id: songId }, (err, updatedSong) => {
-            if (err) {
-                return res.status(500).json({ error: err.message });
-            }
-            if (!updatedSong) {
-                return res.status(404).json({ error: 'Song not found after update' });
-            }
-            res.json({
-                id: updatedSong._id,
-                title: updatedSong.title,
-                artist: updatedSong.artist,
-                listens: updatedSong.listens,
-                description: updatedSong.description || "",
-                created_at: updatedSong.created_at
-            });
+        res.json({ success: true, message: 'Song updated successfully' });
+    } catch (error) {
+        console.error('Failed to update song:', error);
+        res.status(500).json({ error: 'Failed to update song' });
+    }
+});
+
+app.use((req, res) => {
+    res.status(404).json({ error: 'Endpoint not found' });
+});
+
+(async function startServer() {
+    try {
+        await ensureSongsSchema();
+        await pool.getConnection();
+        console.log('Connected to MySQL database.');
+        app.listen(PORT, () => {
+            console.log(`Server listening on port ${PORT}`);
         });
-    });
-});
-
-// Clear all songs
-app.delete('/api/songs', (req, res) => {
-    songsDB.remove({}, { multi: true }, (err, numRemoved) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        res.json({ message: 'All songs cleared', deleted: numRemoved });
-    });
-});
-
-// Get stats
-app.get('/api/stats', (req, res) => {
-    songsDB.find({}, (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        const totalSongs = rows.length;
-        const totalListens = rows.reduce((sum, song) => sum + (song.listens || 0), 0);
-        const avgListens = totalSongs === 0 ? 0 : Math.round(totalListens / totalSongs);
-
-        res.json({
-            totalSongs,
-            totalListens,
-            avgListens
-        });
-    });
-});
-
-// Serve HTML files
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'leaderboard.html'));
-});
-
-app.get('/import', (req, res) => {
-    res.sendFile(path.join(__dirname, 'import.html'));
-});
-
-app.get('/info', (req, res) => {
-    res.sendFile(path.join(__dirname, 'info.html'));
-});
-
-// Start server
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
-
-// Graceful shutdown
-process.on('SIGINT', () => {
-    console.log('Shutting down server...');
-    process.exit(0);
-});
+    } catch (error) {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+    }
+})();
